@@ -1,0 +1,11 @@
+# Composer
+vendor/
+
+# Code coverage report
+coverage/
+
+# IDE
+.idea/
+
+# PHPUnit
+.phpunit.result.cache
