@@ -17,7 +17,7 @@ class CsvFileTest extends TestCase
             $i++;
         }
 
-        $this->assertEquals(100, $i);
+        $this->assertEquals(101, $i);
     }
 
     public function testIterateRows()
@@ -90,5 +90,20 @@ class CsvFileTest extends TestCase
 
             break;
         }
+    }
+
+    public function testSeekToRow()
+    {
+        $secondRow = $this->getTestCsv()->row(1);
+
+        $this->assertEquals('Willie', $secondRow['name/first']);
+        $this->assertEquals('Rodriquez', $secondRow['name/last']);
+    }
+
+    public function testCannotSeekToRowAfterEof()
+    {
+        $this->expectException(\Exception::class);
+
+        $this->getTestCsv()->row(101);
     }
 }

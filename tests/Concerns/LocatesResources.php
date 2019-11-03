@@ -5,6 +5,7 @@ namespace BYanelli\CsvQuery\Tests\Concerns;
 
 
 use BYanelli\CsvQuery\CsvFile;
+use BYanelli\CsvQuery\Stream;
 
 trait LocatesResources
 {
@@ -16,6 +17,11 @@ trait LocatesResources
             'resources',
             $file
         ]));
+    }
+
+    protected function getTestCsvStream(): Stream
+    {
+        return Stream::make($this->resourcesPath('test.csv'));
     }
 
     protected function getTestCsv(): CsvFile

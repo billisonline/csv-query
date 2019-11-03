@@ -38,17 +38,14 @@ class CsvFile
 
     public function lines()
     {
-        $this->stream->rewind();
-
-        $this->parseHeaders($this->stream->readLine());
-
-        while (!$this->stream->eof()) {
-            $line = $this->stream->readLine();
-
-            if ($line == '') {continue;}
-
-            yield $line;
+        foreach ($this->stream->lines() as $lineNumber => $line) {
+            yield $lineNumber => $line;
         }
+    }
+
+    public function line(int $number)
+    {
+        return $this->stream->line($number);
     }
 
     /**
@@ -56,12 +53,43 @@ class CsvFile
      */
     public function rows()
     {
-        foreach ($this->lines() as $line) {
-            yield new CsvRow($line, $this);
+        $first = true;
+
+        foreach ($this->lines() as $lineNumber => $line) {
+            if ($first) {
+                $this->parseHeadersAndSeparator($line);
+
+                $first = false;
+
+                continue;
+            }
+
+            $rowNumber = $this->lineNumberToRowNumber($lineNumber);
+
+            yield $rowNumber => new CsvRow($line, $this);
         }
     }
 
-    private function parseHeaders(string $line)
+    public function row(int $number): CsvRow
+    {
+        $this->parseHeadersAndSeparatorIfNotParsed();
+
+        $line = $this->stream->line($this->rowNumberToLineNumber($number));
+
+        return new CsvRow($line, $this);
+    }
+
+    private function lineNumberToRowNumber(int $lineNumber): int
+    {
+        return $lineNumber - 1;
+    }
+
+    private function rowNumberToLineNumber(int $rowNumber): int
+    {
+        return $rowNumber + 1;
+    }
+
+    private function parseHeadersAndSeparator(string $line)
     {
         if (is_null($this->separator)) {
             $this->separator = ','; //$this->detectSeparator($line);
@@ -74,11 +102,22 @@ class CsvFile
 
     public function getHeaders(): array
     {
+        $this->parseHeadersAndSeparatorIfNotParsed();
+
         return $this->headers;
     }
 
     public function getSeparator(): string
     {
+        $this->parseHeadersAndSeparatorIfNotParsed();
+
         return $this->separator;
+    }
+
+    private function parseHeadersAndSeparatorIfNotParsed(): void
+    {
+        if (!empty($this->separator) && !empty($this->headers)) {return;}
+
+        foreach ($this->rows() as $row) {break;}
     }
 }
