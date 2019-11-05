@@ -24,7 +24,7 @@ class CsvFileTest extends TestCase
     {
         $i = 0;
 
-        foreach ($this->getTestCsv()->rows() as $row) {
+        foreach ($this->getTestCsv()->iterateRows() as $row) {
             $i++;
         }
 
@@ -33,7 +33,7 @@ class CsvFileTest extends TestCase
 
     public function testReadCell()
     {
-        foreach ($this->getTestCsv()->rows() as $row) {
+        foreach ($this->getTestCsv()->iterateRows() as $row) {
             $this->assertEquals('Birdie', $row['name/first']);
             $this->assertEquals('Fox', $row['name/last']);
 
@@ -45,7 +45,7 @@ class CsvFileTest extends TestCase
     }
     public function testCannotReadNonexistentCell()
     {
-        foreach ($this->getTestCsv()->rows() as $row) {
+        foreach ($this->getTestCsv()->iterateRows() as $row) {
             $exceptionCaught = false;
 
             try {
@@ -62,7 +62,7 @@ class CsvFileTest extends TestCase
 
     public function testGetFromNonexistentCellReturnsDefault()
     {
-        foreach ($this->getTestCsv()->rows() as $row) {
+        foreach ($this->getTestCsv()->iterateRows() as $row) {
             $this->assertNull($row->get('name/middle', null));
 
             break;
@@ -71,7 +71,7 @@ class CsvFileTest extends TestCase
 
     public function testCheckCellExistence()
     {
-        foreach ($this->getTestCsv()->rows() as $row) {
+        foreach ($this->getTestCsv()->iterateRows() as $row) {
             $this->assertTrue(isset($row['name/first']));
             $this->assertTrue(isset($row['name/last']));
             $this->assertFalse(isset($row['name/middle']));
@@ -82,7 +82,7 @@ class CsvFileTest extends TestCase
 
     public function testConvertRowToArray()
     {
-        foreach ($this->getTestCsv()->rows() as $row) {
+        foreach ($this->getTestCsv()->iterateRows() as $row) {
             $arr = $row->toArray();
 
             $this->assertEquals('Birdie', $arr['name/first']);

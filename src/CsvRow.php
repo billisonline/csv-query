@@ -7,36 +7,53 @@ use Illuminate\Contracts\Support\Arrayable;
 class CsvRow implements \ArrayAccess, Arrayable
 {
     /**
-     * @var string
-     */
-    private $line;
-
-    /**
      * @var CsvFile
      */
     private $file;
 
     /**
+     * @var int
+     */
+    private $rowNumber;
+
+    /**
+     * @var string
+     */
+    private $line;
+
+    /**
      * @var array
      */
-    private $cells;
+    private $cells = [];
 
-    public function __construct(string $line, CsvFile $file)
+    public function __construct(CsvFile $file, int $rowNumber, string $line='')
     {
-        $this->line = $line;
         $this->file = $file;
-
-        $this->cells = $this->parseRow();
+        $this->rowNumber = $rowNumber;
+        $this->line = $line;
     }
 
-    private function parseRow(): array
+    private function line(): string
     {
-        return str_getcsv($this->line, $this->file->getSeparator());
+        if (empty($this->line)) {
+            $this->line = $this->file->lineForRow($this->rowNumber);
+        }
+
+        return $this->line;
+    }
+
+    private function cells(): array
+    {
+        if (empty($this->cells)) {
+            $this->cells = str_getcsv($this->line(), $this->file->separator());
+        }
+
+        return $this->cells;
     }
 
     public function offsetExists($offset)
     {
-        return array_search($offset, $this->file->getHeaders()) !== false;
+        return array_search($offset, $this->file->headers()) !== false;
     }
 
     public function offsetGet($offset)
@@ -45,24 +62,24 @@ class CsvRow implements \ArrayAccess, Arrayable
             throw new \Exception;
         }
 
-        $index = array_search($offset, $this->file->getHeaders());
+        $index = array_search($offset, $this->file->headers());
 
         if (!$index) {
             throw new \OutOfBoundsException;
         }
 
-        return $this->cells[$index];
+        return $this->cells()[$index];
     }
 
     public function get(string $name, $default = null)
     {
-        $index = array_search($name, $this->file->getHeaders());
+        $index = array_search($name, $this->file->headers());
 
-        if (!$index) {
+        if ($index === false) {
             return $default;
         }
 
-        return $this->cells[$index];
+        return $this->cells()[$index];
     }
 
     public function offsetSet($offset, $value)
@@ -77,6 +94,6 @@ class CsvRow implements \ArrayAccess, Arrayable
 
     public function toArray()
     {
-        return array_combine($this->file->getHeaders(), $this->cells);
+        return array_combine($this->file->headers(), $this->cells());
     }
 }

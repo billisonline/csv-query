@@ -43,7 +43,7 @@ class CsvFile
         }
     }
 
-    public function line(int $number)
+    public function line(int $number): string
     {
         return $this->stream->line($number);
     }
@@ -51,7 +51,7 @@ class CsvFile
     /**
      * @return CsvRow[]|\Generator
      */
-    public function rows()
+    public function iterateRows()
     {
         $first = true;
 
@@ -66,8 +66,13 @@ class CsvFile
 
             $rowNumber = $this->lineNumberToRowNumber($lineNumber);
 
-            yield $rowNumber => new CsvRow($line, $this);
+            yield $rowNumber => new CsvRow($this, $rowNumber, $line);
         }
+    }
+
+    public function rows(): CsvRowCollection
+    {
+        return new CsvRowCollection($this);
     }
 
     public function row(int $number): CsvRow
@@ -76,7 +81,7 @@ class CsvFile
 
         $line = $this->stream->line($this->rowNumberToLineNumber($number));
 
-        return new CsvRow($line, $this);
+        return new CsvRow($this, $number, $line);
     }
 
     private function lineNumberToRowNumber(int $lineNumber): int
@@ -100,14 +105,14 @@ class CsvFile
         }
     }
 
-    public function getHeaders(): array
+    public function headers(): array
     {
         $this->parseHeadersAndSeparatorIfNotParsed();
 
         return $this->headers;
     }
 
-    public function getSeparator(): string
+    public function separator(): string
     {
         $this->parseHeadersAndSeparatorIfNotParsed();
 
@@ -118,6 +123,11 @@ class CsvFile
     {
         if (!empty($this->separator) && !empty($this->headers)) {return;}
 
-        foreach ($this->rows() as $row) {break;}
+        foreach ($this->iterateRows() as $row) {break;}
+    }
+
+    public function lineForRow(int $rowNumber): string
+    {
+        return $this->line($this->rowNumberToLineNumber($rowNumber));
     }
 }
