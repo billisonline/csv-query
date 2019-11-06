@@ -15,6 +15,19 @@ class CsvRowCollectionTest extends TestCase
         return new CsvRowCollection($this->getTestCsv());
     }
 
+    public function testIterateCollection()
+    {
+        $i = 0;
+
+        foreach ($this->getTestCsvCollection() as $row) {
+            $row['name/first'];
+
+            $i++;
+        }
+
+        $this->assertEquals(100, $i);
+    }
+
     public function testWhereEquals()
     {
         $row = (

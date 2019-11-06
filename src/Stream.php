@@ -9,7 +9,7 @@ use GuzzleHttp\Stream\Utils;
 
 class Stream implements StreamInterface
 {
-    use StreamDecoratorTrait;
+    use StreamDecoratorTrait, InteractsWithStreams;
 
     const POSITION_ERROR = -1;
 
@@ -43,9 +43,15 @@ class Stream implements StreamInterface
         return trim(Utils::readLine($this->stream));
     }
 
+
     public function rewind()
     {
         return rewind($this->handle);
+    }
+
+    public function seekBefore(int $position)
+    {
+        $this->stream->seek($position-1);
     }
 
     public function position(): int
@@ -64,60 +70,82 @@ class Stream implements StreamInterface
 
     public function lines()
     {
-        $currentPosition = null;
+        foreach ($this->linePositions() as $lineNumber => $position) {
+            yield $lineNumber => $this->readLine();
 
+            $this->stream->seek($position);
+        }
+    }
+
+    public function linePositions()
+    {
+        $currentPosition = 0;
         $lineNumber = 0;
+        $skipNext = false;
+        $terminateNext = false;
 
         $this->rewind();
 
-        while (!$this->eof()) {
-            // Restore position if our pointer was moved since the last iteration
-            if (
-                !is_null($currentPosition)
-                && ($this->hasMovedFrom($currentPosition))
-            ) {
-                $this->seek($currentPosition);
-            }
+        while (true) {
+            if ($skipNext) {$skipNext = false; continue;}
+            if ($terminateNext) {break;}
 
             // Mark position at the beginning of this line
-            $this->markLinePosition($lineNumber);
+            $this->markLinePosition($lineNumber, $currentPosition);
 
-            $line = $this->readLine();
+            yield $lineNumber => $currentPosition;
+
+            $lineNumber++;
+
+            // If we've already saved the next line position, don't search for it again
+            if (!is_null($savedPosition = $this->linePositions[$lineNumber] ?? null)) {
+                $currentPosition = $savedPosition;
+
+                continue;
+            }
+
+            // Restore position in case our pointer was moved since the last iteration
+            $this->seek($currentPosition);
+
+            // Advance to next line break; record whether line was blank or last line
+            [$lineHasContent, $isLastLine] = $this->advanceLine($this->stream);
 
             // Set current position at the beginning of the next line
             $currentPosition = $this->position();
 
-            // Terminate if we have reached a position in error
-            if ($this->position() === self::POSITION_ERROR) {break;}
+            // On the next iteration, skip if the line had no content
+            $skipNext = !$lineHasContent;
 
-            // Skip blank lines and don't increment line number
-            if (empty($line)) {continue;}
-
-            yield $lineNumber => $line;
-
-            $lineNumber++;
+            // On the next iteration, terminate if we reached the last line, EOF, or an error position
+            $terminateNext = $isLastLine || $this->eof() || ($currentPosition === self::POSITION_ERROR);
         }
     }
 
     private function seekToLine(int $lineNumber): void
     {
+        if ($lineNumber == 0) {
+            $this->rewind();
+            return;
+        }
+
         if ($lineNumber < 0) {
             throw new \Exception('Line number cannot be negative');
         }
 
         // Seek to stored line position if available
         if (!is_null($position = $this->linePositions[$lineNumber] ?? null)) {
-            $this->seek($position);
+            $this->seekBefore($position);
             return;
         }
 
-        foreach ($this->lines() as $i => $line) {
-            if (($i + 1) === $lineNumber) {
+        foreach ($this->linePositions() as $i => $position) {
+            if ($i == $lineNumber) {
+                $this->seekBefore($position);
                 return;
             }
         }
 
-        throw new \Exception('Invalid line number');
+        throw new \Exception("Invalid line number {$i}");
     }
 
     public function line(int $lineNumber): string
@@ -127,8 +155,8 @@ class Stream implements StreamInterface
         return $this->readLine();
     }
 
-    private function markLinePosition(int $lineNumber)
+    private function markLinePosition(int $lineNumber, int $position=-1)
     {
-        $this->linePositions[$lineNumber] = $this->position();
+        $this->linePositions[$lineNumber] = ($position > -1)? $position : $this->position();
     }
 }

@@ -17,6 +17,6 @@ class CsvRowCollection extends LazyCollection
 
     private function makeCsvRowsIterator(CsvFile $file): \Closure
     {
-        return function () use ($file) {return $file->iterateRows();};
+        return function () use ($file) {yield from $file->iterateRows();};
     }
 }

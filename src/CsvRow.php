@@ -19,18 +19,17 @@ class CsvRow implements \ArrayAccess, Arrayable
     /**
      * @var string
      */
-    private $line;
+    private $line = '';
 
     /**
      * @var array
      */
     private $cells = [];
 
-    public function __construct(CsvFile $file, int $rowNumber, string $line='')
+    public function __construct(CsvFile $file, int $rowNumber)
     {
         $this->file = $file;
         $this->rowNumber = $rowNumber;
-        $this->line = $line;
     }
 
     private function line(): string

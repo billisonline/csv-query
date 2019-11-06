@@ -53,20 +53,14 @@ class CsvFile
      */
     public function iterateRows()
     {
-        $first = true;
+        $this->ensureHeadersParsed();
 
-        foreach ($this->lines() as $lineNumber => $line) {
-            if ($first) {
-                $this->parseHeadersAndSeparator($line);
-
-                $first = false;
-
-                continue;
-            }
+        foreach ($this->stream->linePositions() as $lineNumber => $position) {
+            if ($lineNumber == 0) {continue;} // Skip headers
 
             $rowNumber = $this->lineNumberToRowNumber($lineNumber);
 
-            yield $rowNumber => new CsvRow($this, $rowNumber, $line);
+            yield $rowNumber => new CsvRow($this, $rowNumber);
         }
     }
 
@@ -77,11 +71,11 @@ class CsvFile
 
     public function row(int $number): CsvRow
     {
-        $this->parseHeadersAndSeparatorIfNotParsed();
+        $this->ensureHeadersParsed();
 
-        $line = $this->stream->line($this->rowNumberToLineNumber($number));
+        $this->validateRowNumber($number);
 
-        return new CsvRow($this, $number, $line);
+        return new CsvRow($this, $number);
     }
 
     private function lineNumberToRowNumber(int $lineNumber): int
@@ -94,8 +88,10 @@ class CsvFile
         return $rowNumber + 1;
     }
 
-    private function parseHeadersAndSeparator(string $line)
+    private function parseHeaders()
     {
+        $line = $this->line(0);
+
         if (is_null($this->separator)) {
             $this->separator = ','; //$this->detectSeparator($line);
         }
@@ -107,27 +103,41 @@ class CsvFile
 
     public function headers(): array
     {
-        $this->parseHeadersAndSeparatorIfNotParsed();
+        $this->ensureHeadersParsed();
 
         return $this->headers;
     }
 
     public function separator(): string
     {
-        $this->parseHeadersAndSeparatorIfNotParsed();
+        $this->ensureHeadersParsed();
 
         return $this->separator;
     }
 
-    private function parseHeadersAndSeparatorIfNotParsed(): void
+    private function ensureHeadersParsed(): void
     {
-        if (!empty($this->separator) && !empty($this->headers)) {return;}
-
-        foreach ($this->iterateRows() as $row) {break;}
+        if (!$this->headersParsed()) {$this->parseHeaders();}
     }
 
     public function lineForRow(int $rowNumber): string
     {
         return $this->line($this->rowNumberToLineNumber($rowNumber));
+    }
+
+    private function headersParsed(): bool
+    {
+        return !empty($this->separator) && !empty($this->headers);
+    }
+
+    private function validateRowNumber(int $number)
+    {
+        foreach ($this->stream->linePositions() as $i => $position) {
+            if ($i >= $number) {
+                return;
+            }
+        }
+
+        throw new \Exception('Invalid row number');
     }
 }
