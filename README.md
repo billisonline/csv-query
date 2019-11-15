@@ -1,5 +1,7 @@
 # CSV Query
 
+![](https://travis-ci.org/billisonline/csv-query.svg?branch=master)
+
 This library lets you "query" CSV files as fluent collection objects. Each row is encapsulated into a row object which makes cells accessible by their column name. Rows are then bundled into an Illuminate `LazyCollection`, exposing functionality like `where`, `filter`, `map`, `reduce`, `count` and more. (Illuminate is the Laravel support library, but Laravel is not required.)
 
 All content is lazy-loaded and the entire CSV is _never_ read into memory, making this library fast and suitable for use with very large CSV files.
