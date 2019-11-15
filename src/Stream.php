@@ -9,7 +9,7 @@ use GuzzleHttp\Stream\Utils;
 
 class Stream implements StreamInterface
 {
-    use StreamDecoratorTrait, InteractsWithStreams;
+    use StreamDecoratorTrait;
 
     const POSITION_ERROR = -1;
 
@@ -22,6 +22,11 @@ class Stream implements StreamInterface
      * @var int[]|array
      */
     private $linePositions = [];
+
+    /**
+     * @var int[]|array
+     */
+    private $lineLengths = [];
 
     public static function make($resource = '', array $options = [])
     {
@@ -38,20 +43,43 @@ class Stream implements StreamInterface
         $this->stream = $stream;
     }
 
-    public function readLine(): string
+    public function readLine(int $length=0): string
     {
-        return trim(Utils::readLine($this->stream));
+        $ret = '';
+
+        if ($length) {
+            return $this->read($length);
+        }
+
+        $bufferSize = 512;
+
+        while (true) {
+            $buffer = $this->read($bufferSize);
+
+            $lineBreakLocation = strpos($buffer, "\n");
+
+            if (($lineBreakLocation === false) && $this->eof()) {
+                $ret = $buffer;
+
+                break;
+            }
+
+            if ($lineBreakLocation === false) {
+                $ret .= $buffer;
+            } else {
+                $ret .= substr($buffer, 0, $lineBreakLocation);
+
+                break;
+            }
+        }
+
+        return $ret;
     }
 
 
     public function rewind()
     {
         return rewind($this->handle);
-    }
-
-    public function seekBefore(int $position)
-    {
-        $this->stream->seek($position-1);
     }
 
     public function position(): int
@@ -70,8 +98,8 @@ class Stream implements StreamInterface
 
     public function lines()
     {
-        foreach ($this->linePositions() as $lineNumber => $position) {
-            yield $lineNumber => $this->readLine();
+        foreach ($this->linePositions() as $lineNumber => [$position, $length]) {
+            yield $lineNumber => $this->readLine($length);
 
             $this->stream->seek($position);
         }
@@ -79,45 +107,62 @@ class Stream implements StreamInterface
 
     public function linePositions()
     {
+        $buffer = '';
+        $bufferSize = 512;
+        $streamSize = $this->getSize();
+
         $currentPosition = 0;
+        $lineBreakLocation = 0;
         $lineNumber = 0;
         $skipNext = false;
-        $terminateNext = false;
 
         $this->rewind();
 
         while (true) {
-            if ($skipNext) {$skipNext = false; continue;}
-            if ($terminateNext) {break;}
-
-            // Mark position at the beginning of this line
-            $this->markLinePosition($lineNumber, $currentPosition);
-
-            yield $lineNumber => $currentPosition;
-
-            $lineNumber++;
-
-            // If we've already saved the next line position, don't search for it again
-            if (!is_null($savedPosition = $this->linePositions[$lineNumber] ?? null)) {
-                $currentPosition = $savedPosition;
-
+            if ($skipNext) {
                 continue;
             }
 
-            // Restore position in case our pointer was moved since the last iteration
+            if ($this->eof()) {
+                if (empty(trim($buffer))) {
+                    break;
+                }
+
+                if ($bufferSize > 1) {
+                    $bufferSize = $bufferSize / 2;
+                    $this->seek($currentPosition);
+                    continue;
+                } else {
+                    break;
+                }
+            }
+
+            if ($lineBreakLocation !== false) {
+                if (($currentPosition + 1) >= $streamSize) {
+                    break;
+                }
+
+                $this->seek($currentPosition);
+
+                $this->markLinePosition($lineNumber, $currentPosition);
+                $this->markLineLength($lineNumber, $lineBreakLocation);
+
+                yield $lineNumber => [$currentPosition, $lineBreakLocation];
+
+                $lineNumber++;
+            }
+
             $this->seek($currentPosition);
 
-            // Advance to next line break; record whether line was blank or last line
-            [$lineHasContent, $isLastLine] = $this->advanceLine($this->stream);
+            $buffer = $this->read($bufferSize);
 
-            // Set current position at the beginning of the next line
-            $currentPosition = $this->position();
+            $lineBreakLocation = strpos($buffer, "\n");
 
-            // On the next iteration, skip if the line had no content
-            $skipNext = !$lineHasContent;
-
-            // On the next iteration, terminate if we reached the last line, EOF, or an error position
-            $terminateNext = $isLastLine || $this->eof() || ($currentPosition === self::POSITION_ERROR);
+            if ($lineBreakLocation !== false) {
+                $currentPosition += $lineBreakLocation + 1;
+            } else {
+                $currentPosition += $bufferSize;
+            }
         }
     }
 
@@ -133,14 +178,14 @@ class Stream implements StreamInterface
         }
 
         // Seek to stored line position if available
-        if (!is_null($position = $this->linePositions[$lineNumber] ?? null)) {
-            $this->seekBefore($position);
+        if (!is_null($position = $this->getLinePosition($lineNumber))) {
+            $this->seek($position);
             return;
         }
 
-        foreach ($this->linePositions() as $i => $position) {
+        foreach ($this->linePositions() as $i => [$position, $length]) {
             if ($i == $lineNumber) {
-                $this->seekBefore($position);
+                $this->seek($position);
                 return;
             }
         }
@@ -152,11 +197,30 @@ class Stream implements StreamInterface
     {
         $this->seekToLine($lineNumber);
 
+        if (!is_null($length = $this->getLineLength($lineNumber))) {
+            return $this->readLine($length);
+        }
+
         return $this->readLine();
     }
 
-    private function markLinePosition(int $lineNumber, int $position=-1)
+    private function markLinePosition(int $lineNumber, int $position)
     {
-        $this->linePositions[$lineNumber] = ($position > -1)? $position : $this->position();
+        $this->linePositions[$lineNumber] = $position;
+    }
+
+    private function markLineLength(int $lineNumber, int $length)
+    {
+        $this->lineLengths[$lineNumber] = $length;
+    }
+
+    private function getLinePosition(int $lineNumber): ?int
+    {
+        return $this->linePositions[$lineNumber] ?? null;
+    }
+
+    private function getLineLength(int $lineNumber): ?int
+    {
+        return $this->lineLengths[$lineNumber] ?? null;
     }
 }

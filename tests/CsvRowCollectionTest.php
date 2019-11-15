@@ -75,5 +75,16 @@ class CsvRowCollectionTest extends TestCase
         $this->assertEquals(40.38, $avg);
     }
 
+    public function testCount()
+    {
+        $count = (
+            $this->getTestCsv()
+                ->rows()
+                ->count()
+        );
+
+        $this->assertEquals(100, $count);
+    }
+
     // todo: test more collection methods
 }
