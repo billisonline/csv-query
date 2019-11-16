@@ -158,6 +158,8 @@ class Stream implements StreamInterface
 
             $lineBreakLocation = strpos($buffer, "\n");
 
+            //$lineBreakLocation = $lineBreakLocation ?: strpos($buffer, "\r\n");
+
             if ($lineBreakLocation !== false) {
                 $currentPosition += $lineBreakLocation + 1;
             } else {

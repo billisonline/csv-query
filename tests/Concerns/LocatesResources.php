@@ -24,6 +24,11 @@ trait LocatesResources
         return Stream::make($this->resourcesPath('test.csv'));
     }
 
+    protected function getTestCsvCrlfStream(): Stream
+    {
+        return Stream::make($this->resourcesPath('test_crlf.csv'));
+    }
+
     protected function getTestCsv(): CsvFile
     {
         return new CsvFile($this->resourcesPath('test.csv'));
